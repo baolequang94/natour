@@ -1,0 +1,11 @@
+{
+  "name": "starter",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "start": "SET UV_THREADPOOL_SIZE=2 && node event-loop"
+  },
+  "author": "",
+  "license": "ISC"
+}
