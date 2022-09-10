@@ -63,7 +63,7 @@ exports.updateTour = async (req, res) => {
       req.body,
       {
         new: true,
-        runValidators: true,
+        // runValidators: true,
       }
     );
     res.status(200).json({
