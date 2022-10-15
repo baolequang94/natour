@@ -1,8 +1,58 @@
 const Tour = require('../models/tourModel');
 
+exports.aliasTopTours = (req, res, next) => {
+  req.query.limit = 5;
+  req.query.sort = '-ratingsAverage,price';
+  req.query.fields = 'name,price,ratingsAverage,summary,difficulty';
+  next();
+};
+
 exports.getAllTours = async (req, res) => {
   try {
-    const tours = await Tour.find();
+    //1A. Filtering
+    let queryObj = { ...req.query };
+    const excludeFields = ['page', 'sort', 'limit', 'fields'];
+    excludeFields.forEach((el) => delete queryObj[el]);
+
+    //1B. Advanced Filtering
+    const queryStr = JSON.stringify(queryObj);
+    queryObj = JSON.parse(
+      queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`)
+    );
+
+    let query = Tour.find(queryObj);
+
+    //2. Sorting
+    if (req.query.sort) {
+      const sortBy = req.query.sort.split(',').join(' ');
+      query = query.sort(sortBy);
+    } else {
+      query = query.sort('-createdAt');
+    }
+
+    //3. Limit fields
+    if (req.query.fields) {
+      const fields = req.query.fields.split(',').join(' ');
+      query = query.select(fields);
+    } else {
+      query = query.select('-__v');
+    }
+
+    //4.Pagination
+    const page = req.query.page * 1 || 1;
+    const limit = req.query.limit * 1 || 100;
+    const skip = (page - 1) * limit;
+
+    query = query.skip(skip).limit(limit);
+
+    if (req.query.page) {
+      const numTours = await Tour.countDocuments();
+      if (skip >= numTours) throw new Error('This page does not exist');
+    }
+
+    // Execute query
+    const tours = await query;
+
     res.status(200).json({
       status: 'success',
       requestedAt: req.requestTime,
@@ -14,7 +64,7 @@ exports.getAllTours = async (req, res) => {
   } catch (err) {
     res.status(404).json({
       status: 'failed',
-      message: err,
+      message: err.message,
     });
   }
 };
@@ -38,9 +88,7 @@ exports.getTour = async (req, res) => {
 
 exports.createTour = async (req, res) => {
   try {
-    const newTour = await new Tour(
-      req.body
-    ).save();
+    const newTour = await new Tour(req.body).save();
 
     res.status(201).json({
       status: 'success',
@@ -58,14 +106,10 @@ exports.createTour = async (req, res) => {
 
 exports.updateTour = async (req, res) => {
   try {
-    const tour = await Tour.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        // runValidators: true,
-      }
-    );
+    const tour = await Tour.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      // runValidators: true,
+    });
     res.status(200).json({
       status: 'success',
       data: {
